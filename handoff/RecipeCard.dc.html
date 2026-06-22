@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<sc-if value="{{ isCard }}" hint-placeholder-val="{{ true }}">
+  <div onClick="{{ onOpen }}" style="display:flex;gap:13px;background:#FBF6EC;border:1px solid #E6DAC6;border-radius:14px;padding:14px 15px;box-shadow:0 1px 2px rgba(60,46,30,.05);cursor:pointer" style-active="transform:scale(.99)">
+    <div style="flex:none;width:4px;border-radius:3px;background:{{ color }}"></div>
+    <div style="flex:1;min-width:0">
+      <sc-if value="{{ hasTags }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+          <sc-for list="{{ tags }}" as="t" hint-placeholder-count="2">
+            <span style="font-size:11px;color:#8A6A4A;background:#F0E6D4;border-radius:20px;padding:2px 9px">{{ t }}</span>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div style="font-family:'Shippori Mincho',serif;font-size:17px;color:#2E2620;line-height:1.4;font-weight:500">{{ name }}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:9px">
+        <div style="font-size:14px;letter-spacing:1px;line-height:1"><span style="color:#B6492F">{{ filled }}</span><span style="color:#DBCDB6">{{ empty }}</span></div>
+        <div style="font-size:11.5px;color:#9A8C7A">最終作成 {{ dateLabel }}</div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isIndex }}" hint-placeholder-val="{{ true }}">
+  <div onClick="{{ onOpen }}" style="display:flex;align-items:center;gap:13px;padding:14px 4px;border-bottom:1px solid #EAE0CE;cursor:pointer" style-active="background:#FBF6EC">
+    <div style="flex:none;width:9px;height:9px;border-radius:50%;background:{{ color }}"></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Shippori Mincho',serif;font-size:16px;color:#2E2620;line-height:1.35;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ name }}</div>
+      <div style="font-size:11.5px;color:#A8987F;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ tagLine }}</div>
+    </div>
+    <div style="flex:none;text-align:right">
+      <div style="font-size:13px;letter-spacing:1px;line-height:1"><span style="color:#B6492F">{{ filled }}</span><span style="color:#DBCDB6">{{ empty }}</span></div>
+      <div style="font-size:11px;color:#9A8C7A;margin-top:4px">{{ dateLabel }}</div>
+    </div>
+  </div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:340,&quot;height&quot;:110},&quot;recipe&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;any&quot;},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;card&quot;,&quot;index&quot;],&quot;default&quot;:&quot;card&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;onOpen&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const r = this.props.recipe || {};
+    const v = this.props.variant || 'card';
+    const tags = (r.tags || []);
+    return {
+      name: r.name, color: r.color,
+      filled: r.filled, empty: r.empty, dateLabel: r.dateLabel,
+      tags: tags.slice(0, 3), hasTags: tags.length > 0,
+      tagLine: tags.length ? tags.join('・') : 'タグなし',
+      isCard: v === 'card', isIndex: v === 'index',
+      onOpen: this.props.onOpen || (() => {})
+    };
+  }
+}
+</script>
+</body>
+</html>

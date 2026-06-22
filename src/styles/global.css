@@ -1,0 +1,111 @@
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: var(--tap-min);
+}
+
+[data-scroll] {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+[data-scroll]::-webkit-scrollbar {
+  display: none;
+}
+
+.md p {
+  color: #42382C;
+  font-size: 14px;
+  line-height: 1.9;
+  margin: 0 0 12px;
+}
+
+.md h2 {
+  color: var(--color-ink);
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+
+.md ul,
+.md ol {
+  list-style: none;
+  margin: 0 0 14px;
+  padding-left: 4px;
+}
+
+.md li {
+  color: #42382C;
+  font-size: 14px;
+  line-height: 1.85;
+  margin-bottom: 3px;
+  padding-left: 20px;
+  position: relative;
+}
+
+.md ul li::before {
+  background: var(--color-accent);
+  border-radius: 50%;
+  content: "";
+  height: 5px;
+  left: 4px;
+  position: absolute;
+  top: 11px;
+  width: 5px;
+}
+
+.md ol {
+  counter-reset: step;
+}
+
+.md ol li {
+  counter-increment: step;
+}
+
+.md ol li::before {
+  align-items: center;
+  background: #F0E0D6;
+  border-radius: 50%;
+  color: var(--color-accent);
+  content: counter(step);
+  display: flex;
+  font-size: 11px;
+  font-weight: 700;
+  height: 18px;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  top: 1px;
+  width: 18px;
+}
+
+.md strong {
+  color: var(--color-ink);
+  font-weight: 700;
+}
