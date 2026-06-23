@@ -368,6 +368,60 @@ textarea {
   padding: 0;
 }
 
+.tag-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-manage-row {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px 6px 12px;
+}
+
+.tag-manage-hash {
+  color: var(--color-muted);
+  flex: none;
+  font-weight: 700;
+}
+
+.tag-manage-input {
+  background: transparent;
+  border: 0;
+  color: var(--color-ink);
+  flex: 1;
+  font-size: 15px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.tag-manage-count {
+  color: var(--color-muted);
+  flex: none;
+  font-size: 12px;
+}
+
+.tag-manage-del {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-accent);
+  cursor: pointer;
+  display: flex;
+  flex: none;
+  font-size: 20px;
+  height: 32px;
+  justify-content: center;
+  min-height: 32px;
+  width: 32px;
+}
+
 .empty-state {
   color: var(--color-muted);
   padding: 64px 20px;
@@ -623,6 +677,57 @@ textarea {
 .gallery-image {
   height: 196px;
   width: 286px;
+}
+
+.recipe-image--clickable {
+  cursor: zoom-in;
+}
+
+.lightbox {
+  align-items: center;
+  animation: fade .16s ease;
+  background: rgba(20, 14, 8, .92);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.recipe-image.lightbox__image {
+  background: transparent;
+  border-radius: 0;
+  cursor: zoom-out;
+  max-height: 88vh;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.recipe-image.lightbox__image img {
+  height: auto;
+  max-height: 88vh;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+
+.lightbox__close {
+  align-items: center;
+  background: rgba(255, 255, 255, .16);
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font-size: 26px;
+  height: 44px;
+  justify-content: center;
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  width: 44px;
+  z-index: 51;
 }
 
 .image-badge {

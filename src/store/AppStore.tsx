@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { exportBackupZip, getLastBackupAt, importBackupZip } from '../backup';
 import {
+  bulkPutRecipes,
   db,
   deleteList,
   deleteRecipe,
@@ -27,7 +28,7 @@ import { allTags, evalSmart } from '../logic/recipes';
 import type { ManualList, Recipe, RecipeList, SmartCondition, SmartList } from '../types';
 import { colorForString, makeId, reorderByTarget, todayIso } from '../utils/app';
 
-export type Screen = 'home' | 'detail' | 'lists' | 'listDetail' | 'smartEdit' | 'settings' | 'import';
+export type Screen = 'home' | 'detail' | 'lists' | 'listDetail' | 'smartEdit' | 'settings' | 'import' | 'tags';
 export type Tab = 'home' | 'lists' | 'settings';
 export type SortKey = 'old' | 'rated' | 'recent';
 export type ImportStage = 'paste' | 'loading' | 'review';
@@ -48,7 +49,7 @@ export type ToastState = {
 } | null;
 
 export type ConfirmState = {
-  type: 'recipe' | 'list';
+  type: 'recipe' | 'list' | 'tag';
   id: string;
   name: string;
 } | null;
@@ -264,6 +265,9 @@ export type AppActions = {
   previewShare: () => void;
   exportBackup: () => Promise<void>;
   importBackup: (file: File) => Promise<void>;
+  openTagManager: () => void;
+  renameTag: (oldName: string, newName: string) => Promise<void>;
+  requestDeleteTag: (name: string) => void;
 };
 
 type StoreValue = {
@@ -366,6 +370,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       goHome: () => navigateTab('home', 'home'),
       goLists: () => navigateTab('lists', 'lists'),
       goSettings: () => navigateTab('settings', 'settings'),
+      openTagManager: () => dispatch({ type: 'ui:patch', patch: { screen: 'tags', tab: 'settings' } }),
       back: () => {
         if (state.screen === 'detail') {
           dispatch({ type: 'ui:patch', patch: { screen: state.detailReturn, editing: false, tab: state.detailReturn === 'lists' ? 'lists' : state.tab } });
@@ -474,16 +479,60 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
               }
             });
             dispatch({ type: 'toast', message: 'レシピを削除しました' });
-          } else {
+          } else if (target.type === 'list') {
             await deleteList(target.id);
             await refresh();
             dispatch({ type: 'ui:patch', patch: { confirm: null, screen: 'lists', tab: 'lists', selectedListId: null } });
             dispatch({ type: 'toast', message: 'リストを削除しました' });
+          } else {
+            const name = target.id;
+            const now = Date.now();
+            const changed: Recipe[] = [];
+            const recipes = state.recipes.map((r) => {
+              if (!r.tags.includes(name)) return r;
+              const nr = { ...r, tags: r.tags.filter((t) => t !== name), updatedAt: now };
+              changed.push(nr);
+              return nr;
+            });
+            dispatch({
+              type: 'ui:patch',
+              patch: { confirm: null, recipes, activeTags: state.activeTags.filter((t) => t !== name) }
+            });
+            if (changed.length) await bulkPutRecipes(changed);
+            dispatch({ type: 'toast', message: `タグ「${name}」を削除しました` });
           }
         } catch (error) {
           dispatch({ type: 'ui:patch', patch: { confirm: null } });
           showError(error);
+          await refresh();
         }
+      },
+      renameTag: async (oldName, newName) => {
+        const from = oldName.trim();
+        const to = newName.trim();
+        if (!from || !to || from === to) return;
+        const now = Date.now();
+        const changed: Recipe[] = [];
+        const recipes = state.recipes.map((r) => {
+          if (!r.tags.includes(from)) return r;
+          const tags = [...new Set(r.tags.map((t) => (t === from ? to : t)))];
+          const nr = { ...r, tags, updatedAt: now };
+          changed.push(nr);
+          return nr;
+        });
+        if (!changed.length) return;
+        const activeTags = [...new Set(state.activeTags.map((t) => (t === from ? to : t)))];
+        dispatch({ type: 'ui:patch', patch: { recipes, activeTags } });
+        try {
+          await bulkPutRecipes(changed);
+          dispatch({ type: 'toast', message: `タグを「${to}」に変更しました` });
+        } catch (error) {
+          showError(error);
+          await refresh();
+        }
+      },
+      requestDeleteTag: (name) => {
+        dispatch({ type: 'ui:patch', patch: { confirm: { type: 'tag', id: name, name } } });
       },
       startEdit: () => dispatch({ type: 'ui:patch', patch: { editing: true, tagInput: '', editPasteUrl: '' } }),
       saveEdit: () => {

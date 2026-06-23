@@ -1,13 +1,15 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { RecipeImage } from '../components/RecipeImage';
 import { fmtFull, fmtRel, mdToHtml } from '../logic/recipes';
 import { useAppStore, useRecipe } from '../store/AppStore';
+import type { RecipeImage as RecipeImageType } from '../types';
 import { toHostLabel } from '../utils/app';
 
 export function RecipeDetail() {
   const { state, actions, tags } = useAppStore();
   const recipe = useRecipe(state.selectedRecipeId);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [lightbox, setLightbox] = useState<RecipeImageType | null>(null);
 
   const suggestions = useMemo(() => {
     if (!recipe) return [];
@@ -57,6 +59,7 @@ export function RecipeDetail() {
             label={recipe.name}
             className="gallery-image"
             badgeLabel="取り込み画像"
+            onClick={image.src ? () => setLightbox(image) : undefined}
           />
         ))}
         {state.editing && (
@@ -226,6 +229,15 @@ export function RecipeDetail() {
           </button>
         )}
       </div>
+
+      {lightbox && (
+        <div className="lightbox" onClick={() => setLightbox(null)}>
+          <button className="lightbox__close" type="button" aria-label="閉じる" onClick={() => setLightbox(null)}>
+            ×
+          </button>
+          <RecipeImage image={lightbox} label={recipe.name} className="lightbox__image" />
+        </div>
+      )}
     </section>
   );
 }

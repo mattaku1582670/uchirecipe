@@ -13,6 +13,7 @@ import { Lists } from './screens/Lists';
 import { RecipeDetail } from './screens/RecipeDetail';
 import { Settings } from './screens/Settings';
 import { SmartEdit } from './screens/SmartEdit';
+import { TagManager } from './screens/TagManager';
 import { AppStoreProvider, useAppStore } from './store/AppStore';
 import type { ManualList } from './types';
 
@@ -58,6 +59,7 @@ function AppFrame() {
           {state.screen === 'listDetail' && <ListDetail />}
           {state.screen === 'smartEdit' && <SmartEdit />}
           {state.screen === 'settings' && <Settings />}
+          {state.screen === 'tags' && <TagManager />}
           {state.screen === 'import' && <Import />}
         </div>
 
@@ -93,8 +95,14 @@ function AppFrame() {
         <ShortcutHelpSheet open={state.shortcutHelpOpen} onClose={actions.closeShortcutHelp} onPreview={actions.previewShare} />
         <ConfirmSheet
           open={!!state.confirm}
-          title={state.confirm?.type === 'list' ? 'リストを削除' : 'レシピを削除'}
-          message={state.confirm ? `「${state.confirm.name}」を削除します。元に戻せません。` : ''}
+          title={state.confirm?.type === 'list' ? 'リストを削除' : state.confirm?.type === 'tag' ? 'タグを削除' : 'レシピを削除'}
+          message={
+            state.confirm?.type === 'tag'
+              ? `タグ「${state.confirm.name}」を全レシピから外します。`
+              : state.confirm
+                ? `「${state.confirm.name}」を削除します。元に戻せません。`
+                : ''
+          }
           confirmLabel="削除する"
           onConfirm={() => void actions.confirmDelete()}
           onClose={actions.cancelConfirm}

@@ -65,6 +65,17 @@ export function Settings() {
       </section>
 
       <section className="settings-block">
+        <h2>タグ</h2>
+        <button className="choice-row" type="button" onClick={actions.openTagManager}>
+          <span className="choice-icon choice-icon--solid" />
+          <span>
+            <strong>タグの管理</strong>
+            <small>名前の変更・統合・削除（全レシピに反映）</small>
+          </span>
+        </button>
+      </section>
+
+      <section className="settings-block">
         <h2>取り込み</h2>
         <button className="choice-row" type="button" onClick={actions.openShortcutHelp}>
           <span className="choice-icon choice-icon--solid" />

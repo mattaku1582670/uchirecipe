@@ -68,6 +68,10 @@ export async function patchRecipe(id: string, patch: Partial<Omit<Recipe, 'id' |
   });
 }
 
+export async function bulkPutRecipes(recipes: Recipe[]): Promise<void> {
+  await db.recipes.bulkPut(recipes);
+}
+
 export async function deleteRecipe(id: string): Promise<void> {
   await db.transaction('rw', db.recipes, db.lists, async () => {
     await db.recipes.delete(id);

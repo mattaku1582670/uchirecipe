@@ -102,7 +102,13 @@ export function mdToHtml(markdown: string): string {
     mode = null;
   };
 
-  const inline = (value: string) => esc(value).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const inline = (value: string) =>
+    esc(value)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // [text](http...) → リンク（http/https のみ。javascript: 等は無視）
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+      // 裸の URL を自動リンク（既存リンクの href/テキスト内は除外）
+      .replace(/(^|[^"=>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noreferrer">$2</a>');
 
   lines.forEach((line) => {
     const trimmed = line.trim();

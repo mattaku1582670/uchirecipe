@@ -109,3 +109,9 @@ button {
   color: var(--color-ink);
   font-weight: 700;
 }
+
+.md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  word-break: break-all;
+}

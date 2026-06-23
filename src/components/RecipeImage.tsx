@@ -8,12 +8,14 @@ type Props = {
   label: string;
   className?: string;
   badgeLabel?: string;
+  onClick?: () => void;
 };
 
-export function RecipeImage({ image, label, className = '', badgeLabel = '取り込み画像' }: Props) {
+export function RecipeImage({ image, label, className = '', badgeLabel = '取り込み画像', onClick }: Props) {
   const [failed, setFailed] = useState(false);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const color = colorForString(image?.src || label);
+  const clickable = onClick ? ' recipe-image--clickable' : '';
 
   useEffect(() => {
     setFailed(false);
@@ -46,7 +48,7 @@ export function RecipeImage({ image, label, className = '', badgeLabel = '取り
 
   if (!image || image.broken || failed || !image.src) {
     return (
-      <div className={`recipe-image recipe-image--placeholder ${className}`} style={{ background: color }}>
+      <div className={`recipe-image recipe-image--placeholder ${className}${clickable}`} style={{ background: color }} onClick={onClick}>
         <span>{initialOf(label)}</span>
         {(image?.broken || failed) && <small>画像を読み込めません</small>}
       </div>
@@ -56,14 +58,14 @@ export function RecipeImage({ image, label, className = '', badgeLabel = '取り
   const src = image.type === 'local' ? localUrl : image.src;
   if (!src) {
     return (
-      <div className={`recipe-image recipe-image--placeholder ${className}`} style={{ background: color }}>
+      <div className={`recipe-image recipe-image--placeholder ${className}${clickable}`} style={{ background: color }} onClick={onClick}>
         <span>{initialOf(label)}</span>
       </div>
     );
   }
 
   return (
-    <div className={`recipe-image ${className}`}>
+    <div className={`recipe-image ${className}${clickable}`} onClick={onClick}>
       <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} />
       {image.type === 'url' && <span className="image-badge">{badgeLabel}</span>}
     </div>
