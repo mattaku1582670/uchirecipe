@@ -400,6 +400,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           dispatch({ type: 'ui:patch', patch: { screen: state.smartReturn, tab: state.smartReturn === 'lists' ? 'lists' : state.tab, smartDraft: null } });
         } else if (state.screen === 'import') {
           dispatch({ type: 'ui:patch', patch: { screen: state.importReturn, tab: state.importReturn === 'settings' ? 'settings' : 'home' } });
+        } else if (state.screen === 'tags') {
+          dispatch({ type: 'ui:patch', patch: { screen: 'settings', tab: 'settings' } });
         } else {
           dispatch({ type: 'ui:patch', patch: { screen: 'home', tab: 'home' } });
         }

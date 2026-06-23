@@ -14,11 +14,44 @@ import { RecipeDetail } from './screens/RecipeDetail';
 import { Settings } from './screens/Settings';
 import { SmartEdit } from './screens/SmartEdit';
 import { TagManager } from './screens/TagManager';
+import { useRef, type TouchEvent } from 'react';
 import { AppStoreProvider, useAppStore } from './store/AppStore';
 import type { ManualList } from './types';
 
+const BACKABLE_SCREENS = ['detail', 'listDetail', 'smartEdit', 'import', 'tags'];
+const EDGE_PX = 32;
+
 function AppFrame() {
   const { state, actions } = useAppStore();
+  const swipe = useRef<{ active: boolean; x: number; y: number }>({ active: false, x: 0, y: 0 });
+
+  const overlayOpen =
+    state.fabMenuOpen ||
+    state.addSheetOpen ||
+    state.pickerOpen ||
+    state.newListOpen ||
+    state.shortcutHelpOpen ||
+    !!state.confirm;
+  const canSwipeBack = BACKABLE_SCREENS.includes(state.screen) && !overlayOpen;
+
+  const onTouchStart = (event: TouchEvent) => {
+    if (!canSwipeBack || event.touches.length !== 1) {
+      swipe.current.active = false;
+      return;
+    }
+    const touch = event.touches[0];
+    swipe.current = { active: touch.clientX <= EDGE_PX, x: touch.clientX, y: touch.clientY };
+  };
+
+  const onTouchEnd = (event: TouchEvent) => {
+    if (!swipe.current.active) return;
+    swipe.current.active = false;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - swipe.current.x;
+    const dy = touch.clientY - swipe.current.y;
+    // 左端から右へ十分に水平移動したら戻る
+    if (dx > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) actions.back();
+  };
 
   if (state.status === 'loading') {
     return (
@@ -51,7 +84,7 @@ function AppFrame() {
 
   return (
     <main className="app-shell">
-      <div className="app-frame">
+      <div className="app-frame" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="app-scroll" data-scroll>
           {state.screen === 'home' && <Home />}
           {state.screen === 'detail' && <RecipeDetail />}
