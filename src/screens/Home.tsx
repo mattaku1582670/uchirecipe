@@ -72,6 +72,11 @@ export function Home() {
               <RecipeCard key={recipe.id} recipe={recipe} onOpen={() => actions.openRecipe(recipe.id, 'home')} />
             ))}
           </div>
+        ) : state.recipes.length === 0 ? (
+          <div className="empty-state">
+            <h2>レシピがありません</h2>
+            <p>右下の＋から最初のレシピを追加しましょう</p>
+          </div>
         ) : (
           <div className="empty-state">
             <h2>見つかりませんでした</h2>

@@ -23,13 +23,18 @@ export const db = new UchiRecipeDatabase();
 let seedPromise: Promise<void> | null = null;
 
 export function ensureSeedData(): Promise<void> {
-  seedPromise ??= db.transaction('rw', db.recipes, db.lists, db.images, async () => {
-    const [recipeCount, listCount] = await Promise.all([db.recipes.count(), db.lists.count()]);
-    if (recipeCount > 0 || listCount > 0) return;
+  seedPromise ??= (async () => {
+    // 本番（公開版）は空で開始する。サンプルデータはローカル開発時のみ投入。
+    if (import.meta.env.PROD) return;
 
-    await db.recipes.bulkAdd(seedRecipes);
-    await db.lists.bulkAdd(seedLists);
-  });
+    await db.transaction('rw', db.recipes, db.lists, db.images, async () => {
+      const [recipeCount, listCount] = await Promise.all([db.recipes.count(), db.lists.count()]);
+      if (recipeCount > 0 || listCount > 0) return;
+
+      await db.recipes.bulkAdd(seedRecipes);
+      await db.lists.bulkAdd(seedLists);
+    });
+  })();
 
   return seedPromise;
 }
