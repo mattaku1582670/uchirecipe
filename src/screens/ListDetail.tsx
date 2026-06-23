@@ -76,7 +76,13 @@ export function ListDetail() {
             ‹
           </button>
           <div>
-            <h1>{manual.name}</h1>
+            <input
+              className="list-title-input"
+              value={manual.name}
+              onChange={(event) => void actions.renameList(manual.id, event.target.value)}
+              placeholder="リスト名"
+              aria-label="リスト名"
+            />
             <p>{manual.recipeIds.length}件</p>
           </div>
           <button className="pill-button pill-button--accent" type="button" onClick={actions.openPicker}>
@@ -136,7 +142,13 @@ export function ListDetail() {
           ‹
         </button>
         <div>
-          <h1>{list.name}</h1>
+          <input
+            className="list-title-input"
+            value={list.name}
+            onChange={(event) => void actions.renameList(list.id, event.target.value)}
+            placeholder="リスト名"
+            aria-label="リスト名"
+          />
           <p>{results.length}件</p>
         </div>
         <button className="pill-button" type="button" onClick={() => actions.editSmartList(list.id)}>

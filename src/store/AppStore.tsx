@@ -241,6 +241,7 @@ export type AppActions = {
   openNewListMenu: () => void;
   closeNewListMenu: () => void;
   createManualList: () => Promise<void>;
+  renameList: (id: string, name: string) => Promise<void>;
   startCreateSmart: () => void;
   openPicker: () => void;
   closePicker: () => void;
@@ -550,6 +551,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           dispatch({ type: 'ui:patch', patch: { screen: 'listDetail', selectedListId: list.id, tab: 'lists', newListOpen: false } });
         } catch (error) {
           showError(error);
+        }
+      },
+      renameList: async (id, name) => {
+        dispatch({ type: 'list:patch', id, patch: { name } as Partial<RecipeList> });
+        try {
+          await patchList(id, { name } as Partial<RecipeList>);
+        } catch (error) {
+          showError(error);
+          await refresh();
         }
       },
       startCreateSmart: () => {
