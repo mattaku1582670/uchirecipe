@@ -217,6 +217,47 @@ textarea {
   padding: 2px 18px 112px;
 }
 
+.install-hint {
+  align-items: flex-start;
+  background: var(--color-accent-pale);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+}
+
+.install-hint__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.install-hint__body strong {
+  color: var(--color-ink);
+  font-size: 13.5px;
+}
+
+.install-hint__body small {
+  color: var(--color-sub);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.install-hint__close {
+  background: transparent;
+  border: 0;
+  color: var(--color-muted);
+  cursor: pointer;
+  flex: none;
+  font-size: 20px;
+  line-height: 1;
+  min-height: 28px;
+  padding: 0 2px;
+}
+
 .recipe-list {
   display: flex;
   flex-direction: column;

@@ -1,10 +1,20 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/AppStore';
 import { formatDateTime } from '../utils/app';
 
 export function Settings() {
   const { state, actions, tags } = useAppStore();
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [usage, setUsage] = useState<string | null>(null);
+
+  useEffect(() => {
+    navigator.storage
+      ?.estimate?.()
+      .then((estimate) => {
+        if (estimate.usage != null) setUsage(`${(estimate.usage / 1024 / 1024).toFixed(1)} MB`);
+      })
+      .catch(() => {});
+  }, [state.recipes.length, state.imageCount]);
 
   return (
     <section className="screen settings-screen">
@@ -62,6 +72,23 @@ export function Settings() {
             <span>ローカル画像</span>
           </div>
         </div>
+      </section>
+
+      <section className="settings-block">
+        <h2>ストレージ</h2>
+        <div className="settings-row">
+          <span>永続化</span>
+          <strong>{state.storagePersisted == null ? '確認中…' : state.storagePersisted ? '有効' : '未確定'}</strong>
+        </div>
+        {usage && (
+          <div className="settings-row">
+            <span>使用量</span>
+            <strong>{usage}</strong>
+          </div>
+        )}
+        <p className="empty-mini" style={{ marginTop: 10 }}>
+          データはこの端末内のみに保存されます。ホーム画面に追加すると消えにくくなります。定期的にバックアップを。
+        </p>
       </section>
 
       <section className="settings-block">

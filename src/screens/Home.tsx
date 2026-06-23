@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { InstallHint } from '../components/InstallHint';
 import { RecipeCard } from '../components/RecipeCard';
 import { useAppStore } from '../store/AppStore';
 
@@ -32,6 +33,8 @@ export function Home() {
           <p>{state.recipes.length}品</p>
         </div>
       </header>
+
+      <InstallHint />
 
       <label className="search-box">
         <span>⌕</span>

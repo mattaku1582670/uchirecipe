@@ -87,6 +87,7 @@ export type AppState = {
   toast: ToastState;
   confirm: ConfirmState;
   lastBackupAt: number | null;
+  storagePersisted: boolean | null;
 };
 
 type Action =
@@ -144,7 +145,8 @@ const initialState: AppState = {
   smartDraft: null,
   toast: null,
   confirm: null,
-  lastBackupAt: null
+  lastBackupAt: null,
+  storagePersisted: null
 };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -348,6 +350,24 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'toast', message: '前回のバックアップから7日以上経っています' });
     }
   }, [state.lastBackupAt, state.status]);
+
+  // データ消失（特に iOS Safari の7日エビクション）対策に永続ストレージを要求
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (!navigator.storage?.persist) return;
+        let persisted = (await navigator.storage.persisted?.()) ?? false;
+        if (!persisted) persisted = await navigator.storage.persist();
+        if (!cancelled) dispatch({ type: 'ui:patch', patch: { storagePersisted: persisted } });
+      } catch {
+        /* best-effort */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const tags = useMemo(() => allTags(state.recipes), [state.recipes]);
 
