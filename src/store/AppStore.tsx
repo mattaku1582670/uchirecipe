@@ -304,7 +304,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       try {
         await ensureSeedData();
         const [recipes, lists, imageCount] = await Promise.all([getAllRecipes(), getAllLists(), db.images.count()]);
-        const shareMeta = window.location.pathname === '/share' ? metaFromShareQuery(new URLSearchParams(window.location.search)) : null;
+        const isShareRoute = window.location.pathname.replace(/\/+$/, '').endsWith('/share');
+        const shareMeta = isShareRoute ? metaFromShareQuery(new URLSearchParams(window.location.search)) : null;
 
         if (!cancelled) {
           dispatch({

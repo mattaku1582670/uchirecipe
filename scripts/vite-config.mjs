@@ -6,9 +6,14 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
+// GitHub Pages のプロジェクトページ配信時は BASE_PATH=/uchirecipe/ を渡す。
+// 未指定（ローカル開発・ルート配信）では '/'。
+const base = process.env.BASE_PATH ?? '/';
+
 export function createViteConfig() {
   return defineConfig({
     root: projectRoot,
+    base,
     configFile: false,
     plugins: [
       react(),
@@ -23,11 +28,11 @@ export function createViteConfig() {
           background_color: '#F4EDE0',
           display: 'standalone',
           orientation: 'portrait',
-          start_url: '/',
-          scope: '/',
+          start_url: '.',
+          scope: '.',
           icons: [
             {
-              src: '/pwa-icon.svg',
+              src: 'pwa-icon.svg',
               sizes: 'any',
               type: 'image/svg+xml',
               purpose: 'any maskable'
