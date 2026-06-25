@@ -219,6 +219,7 @@ function AppFrame() {
           onClose={actions.closeFabMenu}
           onBlank={() => void actions.createBlankRecipe()}
           onImport={() => actions.startImport('home')}
+          onClipboard={() => void actions.importFromClipboard()}
         />
         <AddToListSheet
           open={state.addSheetOpen}

@@ -64,3 +64,22 @@ export function metaFromShareQuery(params: URLSearchParams): RecipeMeta | null {
     fromSite: true
   };
 }
+
+export function metaFromPaste(value: string): RecipeMeta | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  let query = '';
+  const queryIndex = trimmed.indexOf('?');
+  if (queryIndex >= 0) {
+    query = trimmed.slice(queryIndex + 1);
+  } else if (trimmed.includes('url=')) {
+    query = trimmed;
+  } else {
+    return null;
+  }
+
+  const params = new URLSearchParams(query);
+  if (!params.has('url')) return null;
+  return metaFromShareQuery(params);
+}

@@ -23,7 +23,7 @@ import {
   putLocalImage,
   putRecipe
 } from '../db';
-import { metaFromShareQuery, normalizeUrl, type RecipeMeta } from '../import/fetchRecipeMeta';
+import { metaFromPaste, metaFromShareQuery, normalizeUrl, type RecipeMeta } from '../import/fetchRecipeMeta';
 import { allTags, evalSmart } from '../logic/recipes';
 import type { ManualList, Recipe, RecipeList, SmartCondition, SmartList } from '../types';
 import { colorForString, makeId, reorderByTarget, todayIso } from '../utils/app';
@@ -256,6 +256,7 @@ export type AppActions = {
   saveSmartDraft: () => Promise<void>;
   cancelSmartEdit: () => void;
   startImport: (importReturn?: Screen) => void;
+  importFromClipboard: () => Promise<void>;
   setPasteValue: (value: string) => void;
   runImport: () => Promise<void>;
   patchImportDraft: (patch: Partial<RecipeMeta>) => void;
@@ -722,6 +723,47 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             fabMenuOpen: false
           }
         });
+      },
+      importFromClipboard: async () => {
+        try {
+          if (!navigator.clipboard?.readText) {
+            dispatch({ type: 'toast', message: 'クリップボードから読み取れませんでした' });
+            return;
+          }
+          const text = (await navigator.clipboard.readText()).trim();
+          if (!text) {
+            dispatch({ type: 'toast', message: 'クリップボードに内容がありません' });
+            return;
+          }
+          const meta = metaFromPaste(text);
+          if (meta) {
+            dispatch({
+              type: 'ui:patch',
+              patch: {
+                screen: 'import',
+                importReturn: 'home',
+                importStage: 'review',
+                importDraft: meta,
+                pasteValue: meta.url,
+                fabMenuOpen: false
+              }
+            });
+            return;
+          }
+          dispatch({
+            type: 'ui:patch',
+            patch: {
+              screen: 'import',
+              importReturn: 'home',
+              importStage: 'paste',
+              pasteValue: text,
+              importDraft: null,
+              fabMenuOpen: false
+            }
+          });
+        } catch {
+          dispatch({ type: 'toast', message: 'クリップボードから読み取れませんでした' });
+        }
       },
       setPasteValue: (value) => dispatch({ type: 'ui:patch', patch: { pasteValue: value } }),
       runImport: async () => {

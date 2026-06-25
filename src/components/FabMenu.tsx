@@ -3,9 +3,10 @@ type Props = {
   onClose: () => void;
   onBlank: () => void;
   onImport: () => void;
+  onClipboard: () => void;
 };
 
-export function FabMenu({ open, onClose, onBlank, onImport }: Props) {
+export function FabMenu({ open, onClose, onBlank, onImport, onClipboard }: Props) {
   if (!open) return null;
 
   return (
@@ -18,6 +19,10 @@ export function FabMenu({ open, onClose, onBlank, onImport }: Props) {
         <button type="button" onClick={onImport}>
           <span>↗</span>
           URLから取り込む
+        </button>
+        <button type="button" onClick={onClipboard}>
+          <span>⎘</span>
+          クリップボードから取り込む
         </button>
       </div>
     </div>
