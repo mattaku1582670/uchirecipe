@@ -784,6 +784,51 @@ textarea {
   margin-top: 24px;
 }
 
+.memo-add-button {
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: 999px;
+  color: var(--color-sub);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 24px;
+  min-height: 48px;
+  padding: 0 18px;
+}
+
+.list-memo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.list-memo__head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.list-memo__head > span {
+  color: var(--color-sub);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.list-memo__remove {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--color-sub);
+  cursor: pointer;
+  display: flex;
+  font-size: 20px;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
 .full-width {
   width: 100%;
 }

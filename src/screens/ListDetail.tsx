@@ -89,6 +89,7 @@ export function ListDetail() {
   const [dragging, setDragging] = useState<string | null>(null);
   const [settling, setSettling] = useState<string | null>(null);
   const [, setProjectedIndex] = useState<number | null>(null);
+  const [memoOpen, setMemoOpen] = useState(false);
 
   const manualRecipes = useMemo(() => {
     if (!list || list.type !== 'manual') return [];
@@ -358,6 +359,37 @@ export function ListDetail() {
             <h2>レシピがありません</h2>
             <p>「追加」からレシピを選んでください</p>
           </div>
+        )}
+
+        {(manual.memo && manual.memo.length > 0) || memoOpen ? (
+          <div className="list-memo">
+            <div className="list-memo__head">
+              <span>メモ</span>
+              <button
+                className="list-memo__remove"
+                type="button"
+                aria-label="メモを削除"
+                onClick={() => {
+                  void actions.setListMemo(manual.id, '');
+                  setMemoOpen(false);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <textarea
+              className="body-editor"
+              value={manual.memo ?? ''}
+              onChange={(event) => void actions.setListMemo(manual.id, event.target.value)}
+              placeholder="メモを入力"
+              rows={4}
+              autoFocus={memoOpen && !manual.memo}
+            />
+          </div>
+        ) : (
+          <button className="memo-add-button full-width" type="button" onClick={() => setMemoOpen(true)}>
+            ＋ メモを追加
+          </button>
         )}
 
         <button

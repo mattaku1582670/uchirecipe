@@ -26,6 +26,7 @@ export type ManualList = {
   type: 'manual';
   order: number;
   recipeIds: string[];
+  memo?: string;
 };
 
 export type SmartCondition = {
