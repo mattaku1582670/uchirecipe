@@ -1,9 +1,16 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RecipeImage } from '../components/RecipeImage';
 import { fmtFull, fmtRel, mdToHtml } from '../logic/recipes';
 import { useAppStore, useRecipe } from '../store/AppStore';
 import type { RecipeImage as RecipeImageType } from '../types';
 import { toHostLabel } from '../utils/app';
+
+const LOCKED_VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+const LIGHTBOX_VIEWPORT = 'width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes';
+
+function setViewportContent(content: string) {
+  document.querySelector<HTMLMetaElement>('meta[name="viewport"]')?.setAttribute('content', content);
+}
 
 export function RecipeDetail() {
   const { state, actions, tags } = useAppStore();
@@ -16,6 +23,13 @@ export function RecipeDetail() {
     const query = state.tagInput.trim();
     return tags.filter((tag) => !recipe.tags.includes(tag) && (!query || tag.includes(query))).slice(0, 6);
   }, [recipe, state.tagInput, tags]);
+
+  useEffect(() => {
+    setViewportContent(lightbox ? LIGHTBOX_VIEWPORT : LOCKED_VIEWPORT);
+    return () => {
+      setViewportContent(LOCKED_VIEWPORT);
+    };
+  }, [lightbox]);
 
   if (!recipe) {
     return (

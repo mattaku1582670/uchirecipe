@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { RecipeCard } from '../components/RecipeCard';
 import { evalSmart } from '../logic/recipes';
-import { reorderByTarget, useAppStore, useSelectedList } from '../store/AppStore';
+import { useAppStore, useSelectedList } from '../store/AppStore';
 import type { ManualList, SmartCondition } from '../types';
 
 function conditionSummary(cond: SmartCondition): string {
@@ -13,108 +14,112 @@ function conditionSummary(cond: SmartCondition): string {
   return parts.join(' / ') || 'すべてのレシピ';
 }
 
+type DragSlot = {
+  id: string;
+  top: number;
+  height: number;
+  center: number;
+};
+
+type DragSession = {
+  activeId: string;
+  currentIndex: number;
+  gap: number;
+  latestOffset: number;
+  latestOrder: string[];
+  listId: string;
+  order: string[];
+  slotById: Map<string, DragSlot>;
+  slots: DragSlot[];
+  startIndex: number;
+  startY: number;
+};
+
+function averageSlotGap(slots: DragSlot[]): number {
+  if (slots.length < 2) return 0;
+  let total = 0;
+  let count = 0;
+  for (let index = 0; index < slots.length - 1; index += 1) {
+    const gap = slots[index + 1].top - slots[index].top - slots[index].height;
+    if (Number.isFinite(gap)) {
+      total += Math.max(0, gap);
+      count += 1;
+    }
+  }
+  return count ? total / count : 0;
+}
+
+function orderWithProjection(order: string[], activeId: string, projectedIndex: number): string[] {
+  const withoutActive = order.filter((id) => id !== activeId);
+  const next = [...withoutActive];
+  next.splice(Math.max(0, Math.min(projectedIndex, next.length)), 0, activeId);
+  return next;
+}
+
+function projectedIndexForCenter(session: DragSession, centerY: number): number {
+  let nextIndex = 0;
+  for (const slot of session.slots) {
+    if (slot.id !== session.activeId && centerY > slot.center) nextIndex += 1;
+  }
+  return Math.max(0, Math.min(nextIndex, session.order.length - 1));
+}
+
+function projectedTops(session: DragSession, order: string[]): Map<string, number> {
+  const tops = new Map<string, number>();
+  let top = session.slots[0]?.top ?? 0;
+  order.forEach((id, index) => {
+    tops.set(id, top);
+    top += (session.slotById.get(id)?.height ?? 0) + (index < order.length - 1 ? session.gap : 0);
+  });
+  return tops;
+}
+
+function sameOrder(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
 export function ListDetail() {
   const { state, actions } = useAppStore();
   const list = useSelectedList();
-  const orderRef = useRef<string[]>([]);
-  const dragId = useRef<string | null>(null);
   const dragPointerId = useRef<number | null>(null);
-  const dragStartY = useRef(0);
-  const dragCurrentY = useRef(0);
-  const dragDeltaY = useRef(0);
-  const dragOriginTop = useRef(0);
-  const dragSlotTop = useRef(0);
   const dragCardRefs = useRef(new Map<string, HTMLDivElement>());
-  const previousCardTops = useRef(new Map<string, number>());
+  const dragSession = useRef<DragSession | null>(null);
+  const releaseFrame = useRef<number | null>(null);
   const releaseTimer = useRef<number | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
   const [settling, setSettling] = useState<string | null>(null);
+  const [, setProjectedIndex] = useState<number | null>(null);
 
   const manualRecipes = useMemo(() => {
     if (!list || list.type !== 'manual') return [];
     return list.recipeIds.map((id) => state.recipes.find((recipe) => recipe.id === id)).filter((recipe) => !!recipe);
   }, [list, state.recipes]);
-  const manualOrderKey = list?.type === 'manual' ? list.recipeIds.join('\0') : '';
 
-  const measureSlotTop = (node: HTMLElement) => {
-    const previousTransform = node.style.transform;
-    const previousTransition = node.style.transition;
-    node.style.transition = 'none';
-    node.style.transform = 'none';
-    const top = node.getBoundingClientRect().top;
-    node.style.transform = previousTransform;
-    node.style.transition = previousTransition;
-    return top;
+  const clearReleaseSchedule = () => {
+    if (releaseFrame.current != null) {
+      window.cancelAnimationFrame(releaseFrame.current);
+      releaseFrame.current = null;
+    }
+    if (releaseTimer.current != null) {
+      window.clearTimeout(releaseTimer.current);
+      releaseTimer.current = null;
+    }
+  };
+
+  const clearDragStyles = () => {
+    dragCardRefs.current.forEach((node) => {
+      node.style.transform = '';
+      node.style.transition = '';
+      node.style.removeProperty('--drag-y');
+    });
   };
 
   useEffect(() => {
-    if (list?.type === 'manual') orderRef.current = list.recipeIds;
-  }, [list]);
-
-  useEffect(() => {
     return () => {
-      if (releaseTimer.current != null) window.clearTimeout(releaseTimer.current);
+      clearReleaseSchedule();
+      clearDragStyles();
     };
   }, []);
-
-  useLayoutEffect(() => {
-    if (list?.type !== 'manual') {
-      previousCardTops.current.clear();
-      return;
-    }
-
-    const activeId = dragging ?? settling ?? dragId.current;
-    const previous = previousCardTops.current;
-    const next = new Map<string, number>();
-    const animations: Array<() => void> = [];
-
-    dragCardRefs.current.forEach((node, id) => {
-      const top = node.getBoundingClientRect().top;
-      if (id === activeId) {
-        const slotTop = measureSlotTop(node);
-        dragSlotTop.current = slotTop;
-        if (dragging === id && !settling) {
-          const offset = dragCurrentY.current - dragStartY.current + dragOriginTop.current - slotTop;
-          if (Math.abs(offset - dragDeltaY.current) >= 0.5) {
-            dragDeltaY.current = offset;
-            setDragOffset(offset);
-          }
-        }
-        next.set(id, previous.get(id) ?? slotTop);
-        return;
-      }
-
-      next.set(id, top);
-      const previousTop = previous.get(id);
-      if (previousTop == null) return;
-
-      const delta = previousTop - top;
-      if (Math.abs(delta) < 0.5) return;
-
-      node.style.transition = 'none';
-      node.style.transform = `translateY(${delta}px)`;
-      animations.push(() => {
-        const clearTransition = () => {
-          node.style.transition = '';
-          node.removeEventListener('transitionend', clearTransition);
-        };
-        node.addEventListener('transitionend', clearTransition, { once: true });
-        node.style.transition = 'transform 180ms ease';
-        node.style.transform = '';
-        window.setTimeout(clearTransition, 220);
-      });
-    });
-
-    previousCardTops.current = next;
-
-    if (!animations.length) return;
-    const frame = window.requestAnimationFrame(() => {
-      animations.forEach((animate) => animate());
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [dragging, list?.type, manualOrderKey, settling]);
 
   if (!list) {
     return (
@@ -139,92 +144,163 @@ export function ListDetail() {
     }
   };
 
-  const dragStyle = (recipeId: string): CSSProperties | undefined => {
-    if (dragging !== recipeId) return undefined;
-    return { '--drag-y': `${dragOffset}px` } as CSSProperties;
+  const measureDragSlots = (order: string[]): DragSlot[] | null => {
+    const slots: DragSlot[] = [];
+    for (const id of order) {
+      const node = dragCardRefs.current.get(id);
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      slots.push({ id, top: rect.top, height: rect.height, center: rect.top + rect.height / 2 });
+    }
+    return slots;
+  };
+
+  const applyProjectedTransforms = (session: DragSession, projectedIndex: number) => {
+    const nextOrder = orderWithProjection(session.order, session.activeId, projectedIndex);
+    const tops = projectedTops(session, nextOrder);
+
+    session.latestOrder = nextOrder;
+    session.currentIndex = projectedIndex;
+
+    for (const id of session.order) {
+      if (id === session.activeId) continue;
+      const node = dragCardRefs.current.get(id);
+      const slot = session.slotById.get(id);
+      const nextTop = tops.get(id);
+      if (!node || !slot || nextTop == null) continue;
+
+      const offset = nextTop - slot.top;
+      node.style.transition = 'transform 180ms ease';
+      node.style.transform = Math.abs(offset) < 0.5 ? '' : `translateY(${offset}px)`;
+    }
   };
 
   const onPointerDown = (event: PointerEvent<HTMLButtonElement>, recipeId: string) => {
     if (list.type !== 'manual') return;
-    if (releaseTimer.current != null) {
-      window.clearTimeout(releaseTimer.current);
-      releaseTimer.current = null;
-    }
     event.preventDefault();
-    const cardNode = dragCardRefs.current.get(recipeId) ?? event.currentTarget.closest<HTMLElement>('[data-recipe-id]');
-    const startTop = cardNode?.getBoundingClientRect().top ?? event.currentTarget.getBoundingClientRect().top;
-    if (cardNode) {
-      cardNode.style.transition = '';
-      cardNode.style.transform = '';
-    }
-    dragId.current = recipeId;
+
+    clearReleaseSchedule();
+    clearDragStyles();
+
+    const order = manualRecipes.map((recipe) => recipe!.id);
+    const startIndex = order.indexOf(recipeId);
+    const slots = measureDragSlots(order);
+    if (startIndex < 0 || !slots) return;
+
+    const slotById = new Map(slots.map((slot) => [slot.id, slot]));
+    const session: DragSession = {
+      activeId: recipeId,
+      currentIndex: startIndex,
+      gap: averageSlotGap(slots),
+      latestOffset: 0,
+      latestOrder: order,
+      listId: list.id,
+      order,
+      slotById,
+      slots,
+      startIndex,
+      startY: event.clientY
+    };
+    dragSession.current = session;
     dragPointerId.current = event.pointerId;
-    dragStartY.current = event.clientY;
-    dragCurrentY.current = event.clientY;
-    dragDeltaY.current = 0;
-    dragOriginTop.current = startTop;
-    dragSlotTop.current = startTop;
-    setDragOffset(0);
+
+    const activeNode = dragCardRefs.current.get(recipeId);
+    if (activeNode) activeNode.style.setProperty('--drag-y', '0px');
+
     setSettling(null);
     setDragging(recipeId);
+    setProjectedIndex(startIndex);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
-    if (list.type !== 'manual' || !dragId.current || dragPointerId.current !== event.pointerId) return;
+    const session = dragSession.current;
+    if (!session || dragPointerId.current !== event.pointerId) return;
     event.preventDefault();
-    const activeId = dragId.current;
-    dragCurrentY.current = event.clientY;
-    const offset = event.clientY - dragStartY.current + dragOriginTop.current - dragSlotTop.current;
-    dragDeltaY.current = offset;
-    setDragOffset(offset);
 
-    const activeNode = dragCardRefs.current.get(activeId);
-    if (activeNode) activeNode.style.pointerEvents = 'none';
-    const element = document.elementFromPoint(event.clientX, event.clientY);
-    if (activeNode) activeNode.style.pointerEvents = '';
-    const target = element?.closest<HTMLElement>('[data-recipe-id]')?.dataset.recipeId;
-    if (!target || target === activeId) return;
-    const next = reorderByTarget(orderRef.current, activeId, target);
-    if (next === orderRef.current) return;
-    orderRef.current = next;
-    void actions.setManualRecipeOrder(list.id, next);
+    const offset = event.clientY - session.startY;
+    session.latestOffset = offset;
+
+    const activeNode = dragCardRefs.current.get(session.activeId);
+    if (activeNode) activeNode.style.setProperty('--drag-y', `${offset}px`);
+
+    const activeSlot = session.slotById.get(session.activeId);
+    if (!activeSlot) return;
+
+    const nextIndex = projectedIndexForCenter(session, activeSlot.center + offset);
+    if (nextIndex === session.currentIndex) return;
+
+    applyProjectedTransforms(session, nextIndex);
+    setProjectedIndex(nextIndex);
   };
 
   const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
     if (dragPointerId.current !== event.pointerId) return;
-    const activeId = dragId.current;
-    dragId.current = null;
+    const session = dragSession.current;
     dragPointerId.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    if (!activeId) return;
-    setSettling(activeId);
-    setDragOffset(dragDeltaY.current);
-    window.requestAnimationFrame(() => setDragOffset(0));
+    if (!session) return;
+    event.preventDefault();
+
+    const finalOrder = session.latestOrder;
+    const finalTops = projectedTops(session, finalOrder);
+    const activeSlot = session.slotById.get(session.activeId);
+    const finalTop = finalTops.get(session.activeId) ?? activeSlot?.top ?? 0;
+    const settleOffset = activeSlot ? activeSlot.top + session.latestOffset - finalTop : 0;
+    const changed = !sameOrder(session.order, finalOrder);
+
+    for (const id of session.order) {
+      const node = dragCardRefs.current.get(id);
+      if (!node) continue;
+      node.style.transition = id === session.activeId ? 'none' : '';
+      if (id === session.activeId) {
+        node.style.setProperty('--drag-y', `${settleOffset}px`);
+      } else {
+        node.style.transform = '';
+      }
+    }
+
+    flushSync(() => {
+      setSettling(session.activeId);
+      setProjectedIndex(session.currentIndex);
+      if (changed) void actions.setManualRecipeOrder(session.listId, finalOrder);
+    });
+
+    releaseFrame.current = window.requestAnimationFrame(() => {
+      releaseFrame.current = null;
+      const node = dragCardRefs.current.get(session.activeId);
+      if (node) {
+        node.style.transition = '';
+        node.style.setProperty('--drag-y', '0px');
+      }
+    });
+
     releaseTimer.current = window.setTimeout(() => {
-      const node = dragCardRefs.current.get(activeId);
-      if (node) previousCardTops.current.set(activeId, node.getBoundingClientRect().top);
       releaseTimer.current = null;
-      dragDeltaY.current = 0;
-      setSettling(null);
-      setDragOffset(0);
-      setDragging(null);
+      clearDragStyles();
+      dragSession.current = null;
+      flushSync(() => {
+        setSettling(null);
+        setDragging(null);
+        setProjectedIndex(null);
+      });
     }, 190);
   };
 
   const onPointerCancel = (event: PointerEvent<HTMLButtonElement>) => {
     if (dragPointerId.current !== event.pointerId) return;
-    dragId.current = null;
     dragPointerId.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    dragDeltaY.current = 0;
+    clearReleaseSchedule();
+    clearDragStyles();
+    dragSession.current = null;
     setSettling(null);
-    setDragOffset(0);
     setDragging(null);
+    setProjectedIndex(null);
   };
 
   if (list.type === 'manual') {
@@ -259,7 +335,6 @@ export function ListDetail() {
                 key={recipe!.id}
                 data-recipe-id={recipe!.id}
                 ref={setDragCardRef(recipe!.id)}
-                style={dragStyle(recipe!.id)}
               >
                 <button
                   className="drag-handle"
