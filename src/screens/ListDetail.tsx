@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { RecipeCard } from '../components/RecipeCard';
 import { evalSmart } from '../logic/recipes';
 import { reorderByTarget, useAppStore, useSelectedList } from '../store/AppStore';
@@ -18,16 +18,103 @@ export function ListDetail() {
   const list = useSelectedList();
   const orderRef = useRef<string[]>([]);
   const dragId = useRef<string | null>(null);
+  const dragPointerId = useRef<number | null>(null);
+  const dragStartY = useRef(0);
+  const dragCurrentY = useRef(0);
+  const dragDeltaY = useRef(0);
+  const dragOriginTop = useRef(0);
+  const dragSlotTop = useRef(0);
+  const dragCardRefs = useRef(new Map<string, HTMLDivElement>());
+  const previousCardTops = useRef(new Map<string, number>());
+  const releaseTimer = useRef<number | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [settling, setSettling] = useState<string | null>(null);
 
   const manualRecipes = useMemo(() => {
     if (!list || list.type !== 'manual') return [];
     return list.recipeIds.map((id) => state.recipes.find((recipe) => recipe.id === id)).filter((recipe) => !!recipe);
   }, [list, state.recipes]);
+  const manualOrderKey = list?.type === 'manual' ? list.recipeIds.join('\0') : '';
+
+  const measureSlotTop = (node: HTMLElement) => {
+    const previousTransform = node.style.transform;
+    const previousTransition = node.style.transition;
+    node.style.transition = 'none';
+    node.style.transform = 'none';
+    const top = node.getBoundingClientRect().top;
+    node.style.transform = previousTransform;
+    node.style.transition = previousTransition;
+    return top;
+  };
 
   useEffect(() => {
     if (list?.type === 'manual') orderRef.current = list.recipeIds;
   }, [list]);
+
+  useEffect(() => {
+    return () => {
+      if (releaseTimer.current != null) window.clearTimeout(releaseTimer.current);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (list?.type !== 'manual') {
+      previousCardTops.current.clear();
+      return;
+    }
+
+    const activeId = dragging ?? settling ?? dragId.current;
+    const previous = previousCardTops.current;
+    const next = new Map<string, number>();
+    const animations: Array<() => void> = [];
+
+    dragCardRefs.current.forEach((node, id) => {
+      const top = node.getBoundingClientRect().top;
+      if (id === activeId) {
+        const slotTop = measureSlotTop(node);
+        dragSlotTop.current = slotTop;
+        if (dragging === id && !settling) {
+          const offset = dragCurrentY.current - dragStartY.current + dragOriginTop.current - slotTop;
+          if (Math.abs(offset - dragDeltaY.current) >= 0.5) {
+            dragDeltaY.current = offset;
+            setDragOffset(offset);
+          }
+        }
+        next.set(id, previous.get(id) ?? slotTop);
+        return;
+      }
+
+      next.set(id, top);
+      const previousTop = previous.get(id);
+      if (previousTop == null) return;
+
+      const delta = previousTop - top;
+      if (Math.abs(delta) < 0.5) return;
+
+      node.style.transition = 'none';
+      node.style.transform = `translateY(${delta}px)`;
+      animations.push(() => {
+        const clearTransition = () => {
+          node.style.transition = '';
+          node.removeEventListener('transitionend', clearTransition);
+        };
+        node.addEventListener('transitionend', clearTransition, { once: true });
+        node.style.transition = 'transform 180ms ease';
+        node.style.transform = '';
+        window.setTimeout(clearTransition, 220);
+      });
+    });
+
+    previousCardTops.current = next;
+
+    if (!animations.length) return;
+    const frame = window.requestAnimationFrame(() => {
+      animations.forEach((animate) => animate());
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [dragging, list?.type, manualOrderKey, settling]);
 
   if (!list) {
     return (
@@ -44,26 +131,99 @@ export function ListDetail() {
     );
   }
 
+  const setDragCardRef = (recipeId: string) => (node: HTMLDivElement | null) => {
+    if (node) {
+      dragCardRefs.current.set(recipeId, node);
+    } else {
+      dragCardRefs.current.delete(recipeId);
+    }
+  };
+
+  const dragStyle = (recipeId: string): CSSProperties | undefined => {
+    if (dragging !== recipeId) return undefined;
+    return { '--drag-y': `${dragOffset}px` } as CSSProperties;
+  };
+
   const onPointerDown = (event: PointerEvent<HTMLButtonElement>, recipeId: string) => {
     if (list.type !== 'manual') return;
+    if (releaseTimer.current != null) {
+      window.clearTimeout(releaseTimer.current);
+      releaseTimer.current = null;
+    }
+    event.preventDefault();
+    const cardNode = dragCardRefs.current.get(recipeId) ?? event.currentTarget.closest<HTMLElement>('[data-recipe-id]');
+    const startTop = cardNode?.getBoundingClientRect().top ?? event.currentTarget.getBoundingClientRect().top;
+    if (cardNode) {
+      cardNode.style.transition = '';
+      cardNode.style.transform = '';
+    }
     dragId.current = recipeId;
+    dragPointerId.current = event.pointerId;
+    dragStartY.current = event.clientY;
+    dragCurrentY.current = event.clientY;
+    dragDeltaY.current = 0;
+    dragOriginTop.current = startTop;
+    dragSlotTop.current = startTop;
+    setDragOffset(0);
+    setSettling(null);
     setDragging(recipeId);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
-    if (list.type !== 'manual' || !dragId.current) return;
+    if (list.type !== 'manual' || !dragId.current || dragPointerId.current !== event.pointerId) return;
+    event.preventDefault();
+    const activeId = dragId.current;
+    dragCurrentY.current = event.clientY;
+    const offset = event.clientY - dragStartY.current + dragOriginTop.current - dragSlotTop.current;
+    dragDeltaY.current = offset;
+    setDragOffset(offset);
+
+    const activeNode = dragCardRefs.current.get(activeId);
+    if (activeNode) activeNode.style.pointerEvents = 'none';
     const element = document.elementFromPoint(event.clientX, event.clientY);
+    if (activeNode) activeNode.style.pointerEvents = '';
     const target = element?.closest<HTMLElement>('[data-recipe-id]')?.dataset.recipeId;
-    if (!target || target === dragId.current) return;
-    const next = reorderByTarget(orderRef.current, dragId.current, target);
+    if (!target || target === activeId) return;
+    const next = reorderByTarget(orderRef.current, activeId, target);
     if (next === orderRef.current) return;
     orderRef.current = next;
     void actions.setManualRecipeOrder(list.id, next);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    if (dragPointerId.current !== event.pointerId) return;
+    const activeId = dragId.current;
     dragId.current = null;
+    dragPointerId.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!activeId) return;
+    setSettling(activeId);
+    setDragOffset(dragDeltaY.current);
+    window.requestAnimationFrame(() => setDragOffset(0));
+    releaseTimer.current = window.setTimeout(() => {
+      const node = dragCardRefs.current.get(activeId);
+      if (node) previousCardTops.current.set(activeId, node.getBoundingClientRect().top);
+      releaseTimer.current = null;
+      dragDeltaY.current = 0;
+      setSettling(null);
+      setDragOffset(0);
+      setDragging(null);
+    }, 190);
+  };
+
+  const onPointerCancel = (event: PointerEvent<HTMLButtonElement>) => {
+    if (dragPointerId.current !== event.pointerId) return;
+    dragId.current = null;
+    dragPointerId.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragDeltaY.current = 0;
+    setSettling(null);
+    setDragOffset(0);
     setDragging(null);
   };
 
@@ -90,13 +250,16 @@ export function ListDetail() {
           </button>
         </header>
 
+        <div className="list-detail-body" data-scroll>
         {manualRecipes.length > 0 ? (
           <div className="recipe-list drag-list">
             {manualRecipes.map((recipe) => (
               <div
-                className={`drag-card ${dragging === recipe!.id ? 'is-dragging' : ''}`}
+                className={`drag-card ${dragging === recipe!.id ? `is-dragging ${settling === recipe!.id ? 'is-settling' : ''}` : ''}`}
                 key={recipe!.id}
                 data-recipe-id={recipe!.id}
+                ref={setDragCardRef(recipe!.id)}
+                style={dragStyle(recipe!.id)}
               >
                 <button
                   className="drag-handle"
@@ -105,7 +268,7 @@ export function ListDetail() {
                   onPointerDown={(event) => onPointerDown(event, recipe!.id)}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerUp}
+                  onPointerCancel={onPointerCancel}
                 >
                   ≡
                 </button>
@@ -129,6 +292,7 @@ export function ListDetail() {
         >
           このリストを削除
         </button>
+        </div>
       </section>
     );
   }
@@ -156,6 +320,7 @@ export function ListDetail() {
         </button>
       </header>
 
+      <div className="list-detail-body" data-scroll>
       <section className="condition-card">
         <span className="auto-badge">自動</span>
         <p>{conditionSummary(list.cond)}</p>
@@ -181,6 +346,7 @@ export function ListDetail() {
       >
         このリストを削除
       </button>
+      </div>
     </section>
   );
 }

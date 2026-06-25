@@ -43,6 +43,17 @@ export function Home() {
           onChange={(event) => actions.setSearch(event.target.value)}
           placeholder="レシピ・タグを検索"
         />
+        {state.search && (
+          <button
+            className="search-box__clear"
+            type="button"
+            aria-label="検索をクリア"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => actions.setSearch('')}
+          >
+            ×
+          </button>
+        )}
       </label>
 
       <div className="chip-scroll" data-scroll>
