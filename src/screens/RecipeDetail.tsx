@@ -66,21 +66,67 @@ export function RecipeDetail() {
       </header>
 
       <div className="gallery" data-scroll>
-        {images.map((image, index) => (
-          <RecipeImage
-            key={`${image.src || 'placeholder'}-${index}`}
-            image={image}
-            label={recipe.name}
-            className="gallery-image"
-            badgeLabel="取り込み画像"
-            onClick={image.src ? () => setLightbox(image) : undefined}
-          />
-        ))}
+        {images.map((image, index) => {
+          const hasImage = Boolean(image.src);
+          const isFirst = index === 0;
+          const isLast = index === images.length - 1;
+
+          return (
+            <div
+              className={`gallery-item${state.editing && hasImage ? ' gallery-item--editable' : ''}`}
+              key={`${image.src || 'placeholder'}-${index}`}
+            >
+              <RecipeImage
+                image={image}
+                label={recipe.name}
+                className="gallery-image"
+                badgeLabel="取り込み画像"
+                onClick={hasImage ? () => setLightbox(image) : undefined}
+              />
+              {state.editing && hasImage && (
+                <>
+                  <button
+                    className="image-delete-button"
+                    type="button"
+                    onClick={() => void actions.removeImage(recipe.id, index)}
+                    aria-label="写真を削除"
+                  >
+                    ×
+                  </button>
+                  <div className="image-order-controls" aria-label="写真の並べ替え">
+                    <button
+                      type="button"
+                      disabled={isFirst}
+                      onClick={() => void actions.moveImage(recipe.id, index, 'prev')}
+                      aria-label="写真を左へ移動"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isLast}
+                      onClick={() => void actions.moveImage(recipe.id, index, 'next')}
+                      aria-label="写真を右へ移動"
+                    >
+                      ▶
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
         {state.editing && (
-          <button className="add-photo" type="button" onClick={() => fileInputRef.current?.click()}>
-            <span>＋</span>
-            写真を追加
-          </button>
+          <>
+            <button className="add-photo" type="button" onClick={() => fileInputRef.current?.click()}>
+              <span>＋</span>
+              写真を追加
+            </button>
+            <button className="add-photo add-photo--clipboard" type="button" onClick={() => void actions.pasteImageFromClipboard(recipe.id)}>
+              <span>📋</span>
+              クリップボードから貼り付け
+            </button>
+          </>
         )}
       </div>
       <input

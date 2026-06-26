@@ -881,6 +881,73 @@ textarea {
   width: 286px;
 }
 
+.gallery-item {
+  flex: none;
+  position: relative;
+}
+
+.gallery-item--editable .image-badge {
+  left: 9px;
+  right: auto;
+}
+
+.image-delete-button {
+  align-items: center;
+  background: rgba(40, 28, 16, .58);
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-surface);
+  cursor: pointer;
+  display: flex;
+  font-size: 23px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0 0 2px;
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  width: 34px;
+  z-index: 2;
+}
+
+.image-order-controls {
+  align-items: center;
+  background: rgba(40, 28, 16, .58);
+  border-radius: 999px;
+  bottom: 10px;
+  display: flex;
+  gap: 4px;
+  left: 50%;
+  padding: 4px;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.image-order-controls button {
+  align-items: center;
+  background: rgba(251, 246, 236, .92);
+  border: 0;
+  border-radius: 999px;
+  color: var(--color-ink);
+  cursor: pointer;
+  display: flex;
+  font-size: 14px;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 36px;
+}
+
+.image-order-controls button:disabled {
+  cursor: default;
+  opacity: .38;
+}
+
 .recipe-image--clickable {
   cursor: zoom-in;
 }
@@ -965,6 +1032,13 @@ textarea {
 
 .add-photo span {
   font-size: 28px;
+}
+
+.add-photo--clipboard {
+  line-height: 1.4;
+  padding: 0 12px;
+  text-align: center;
+  width: 150px;
 }
 
 .detail-content {

@@ -12,6 +12,7 @@ import { exportBackupZip, getLastBackupAt, importBackupZip } from '../backup';
 import {
   bulkPutRecipes,
   db,
+  deleteLocalImage,
   deleteList,
   deleteRecipe,
   ensureSeedData,
@@ -237,7 +238,10 @@ export type AppActions = {
   removeTag: (recipeId: string, tag: string) => Promise<void>;
   setEditPasteUrl: (value: string) => void;
   runEditImport: (recipeId: string) => Promise<void>;
-  addLocalImage: (recipeId: string, file: File) => Promise<void>;
+  addLocalImage: (recipeId: string, blob: Blob) => Promise<void>;
+  pasteImageFromClipboard: (recipeId: string) => Promise<void>;
+  moveImage: (recipeId: string, index: number, direction: 'prev' | 'next') => Promise<void>;
+  removeImage: (recipeId: string, index: number) => Promise<void>;
   openAddSheet: (recipeId: string) => void;
   closeAddSheet: () => void;
   toggleInList: (listId: string, recipeId: string) => Promise<void>;
@@ -384,6 +388,26 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     };
 
     const navigateTab = (screen: Screen, tab: Tab) => dispatch({ type: 'ui:patch', patch: { screen, tab, editing: false } });
+    const saveLocalImage = async (recipeId: string, blob: Blob) => {
+      const recipe = currentRecipe(recipeId);
+      if (!recipe) return;
+
+      const key = makeId(`img_${recipeId}`);
+      const images = [...recipe.images, { type: 'local' as const, src: key }];
+      const now = Date.now();
+      await putLocalImage({ key, blob, createdAt: now, updatedAt: now });
+
+      try {
+        await patchRecipe(recipeId, { images });
+      } catch (error) {
+        await deleteLocalImage(key).catch(() => undefined);
+        throw error;
+      }
+
+      dispatch({ type: 'recipe:patch', id: recipeId, patch: { images } });
+      dispatch({ type: 'ui:patch', patch: { imageCount: state.imageCount + 1 } });
+      dispatch({ type: 'toast', message: '写真を追加しました' });
+    };
 
     return {
       refresh,
@@ -585,17 +609,75 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'ui:patch', patch: { editPasteUrl: '' } });
         dispatch({ type: 'toast', message: 'URLを保存しました' });
       },
-      addLocalImage: async (recipeId, file) => {
-        const recipe = currentRecipe(recipeId);
-        if (!recipe) return;
+      addLocalImage: async (recipeId, blob) => {
         try {
-          const key = makeId(`img_${recipeId}`);
-          await putLocalImage({ key, blob: file, createdAt: Date.now(), updatedAt: Date.now() });
-          await actions.patchRecipe(recipeId, { images: [...recipe.images, { type: 'local', src: key }] });
-          dispatch({ type: 'ui:patch', patch: { imageCount: state.imageCount + 1 } });
-          dispatch({ type: 'toast', message: '写真を追加しました' });
+          await saveLocalImage(recipeId, blob);
         } catch (error) {
           showError(error);
+          await refresh();
+        }
+      },
+      pasteImageFromClipboard: async (recipeId) => {
+        try {
+          if (!navigator.clipboard?.read) {
+            throw new Error('クリップボードから読み取れませんでした');
+          }
+
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const type = item.types.find((itemType) => itemType.startsWith('image/'));
+            if (!type) continue;
+
+            const blob = await item.getType(type);
+            await saveLocalImage(recipeId, blob);
+            return;
+          }
+
+          dispatch({ type: 'toast', message: '画像が見つかりませんでした' });
+        } catch (error) {
+          showError(error);
+          await refresh();
+        }
+      },
+      moveImage: async (recipeId, index, direction) => {
+        const recipe = currentRecipe(recipeId);
+        if (!recipe) return;
+
+        const targetIndex = direction === 'prev' ? index - 1 : index + 1;
+        if (index < 0 || index >= recipe.images.length || targetIndex < 0 || targetIndex >= recipe.images.length) return;
+
+        const images = [...recipe.images];
+        [images[index], images[targetIndex]] = [images[targetIndex], images[index]];
+
+        try {
+          await patchRecipe(recipeId, { images });
+          dispatch({ type: 'recipe:patch', id: recipeId, patch: { images } });
+        } catch (error) {
+          showError(error);
+          await refresh();
+        }
+      },
+      removeImage: async (recipeId, index) => {
+        const recipe = currentRecipe(recipeId);
+        const image = recipe?.images[index];
+        if (!recipe || !image) return;
+
+        const images = recipe.images.filter((_, imageIndex) => imageIndex !== index);
+
+        try {
+          await patchRecipe(recipeId, { images });
+          if (image.type === 'local' && image.src) {
+            await deleteLocalImage(image.src);
+          }
+
+          dispatch({ type: 'recipe:patch', id: recipeId, patch: { images } });
+          if (image.type === 'local' && image.src) {
+            dispatch({ type: 'ui:patch', patch: { imageCount: Math.max(0, state.imageCount - 1) } });
+          }
+          dispatch({ type: 'toast', message: '写真を削除しました' });
+        } catch (error) {
+          showError(error);
+          await refresh();
         }
       },
       openAddSheet: (recipeId) => dispatch({ type: 'ui:patch', patch: { addSheetOpen: true, addTargetRecipeId: recipeId } }),
